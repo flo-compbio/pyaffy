@@ -15,6 +15,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+from math import floor
 
 import numpy as np
 from scipy.stats import norm
@@ -44,19 +45,22 @@ def rma_bg_correct(Y, make_copy = False):
         missing = np.isnan(Y[:,j])
         y = Y[~missing,j]
         
-        ### estimate mu using simple binning (histogram method)
+        ### estimate mu using simple binning (histogram)
 
-        # we fix the bin width to 4
-        bin_width = 4
-        # we are only interested in the distribution of probes with
-        # intensities < 500
-        bin_edges = np.arange(0, 501, bin_width) 
+        # use a fixed number of bins
+        num_bins = 100
+        lower = np.amin(y)
+        upper = np.percentile(y, 75.0)
+        bin_width = max(floor((upper - lower) / num_bins), 1.0)
+        bin_edges = np.arange(lower, upper, bin_width)
         num_bins = bin_edges.size - 1
+        
+        # binning
         binned = np.digitize(y, bins = bin_edges) - 1
         binned = binned[binned < num_bins]
         bc = np.bincount(binned)
-        mx = np.argmax(bc)
-        max_x = (mx + 0.5) * bin_width
+        amax = np.argmax(bc)
+        max_x = lower + (amax + 0.5) * bin_width
         mu = max_x
         logger.debug('Mu: %.2f', mu)
 

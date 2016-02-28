@@ -25,6 +25,7 @@ from genometools.expression import quantile_normalize as qnorm
 from genometools.expression import ExpMatrix
 
 from .cdfparser import parse_cdf
+from . import celparser
 from .celparser import parse_cel
 from .medpolish import medpolish
 from .background import rma_bg_correct
@@ -126,12 +127,15 @@ def rma(
     n = len(sample_cel_files)
     Y = np.empty((p, n), dtype = np.float32)
     samples = []
+    sub_logger = logging.getLogger(celparser.__name__)
+    sub_logger.setLevel(logging.WARNING)
     for j, (sample, cel_file) in enumerate(sample_cel_files.iteritems()):
 
         logger.debug('Parsing CEL file for sample "%s": %s', sample, cel_file)
         samples.append(sample)
         y = parse_cel(cel_file)
         Y[:,j] = y[pm_sel]
+    sub_logger.setLevel(logging.NOTSET)
     t1 = time.time()
     logger.info('CEL files parsing time: %.1f s.', t1 - t0)
 
