@@ -53,7 +53,7 @@ class CELHeader(object):
         for h in parent_headers:
             assert isinstance(h, CELHeader)
             
-        Self.data_type_id = data_type_id
+        self.data_type_id = data_type_id
         self.file_id = file_id
         self.creation_time = creation_time
         self.locale = locale

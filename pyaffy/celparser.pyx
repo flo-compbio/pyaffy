@@ -48,6 +48,11 @@ import logging
 import tempfile
 import gzip
 import io
+import struct
+import dateutil
+import codecs
+from collections import OrderedDict
+
 
 from configparser import ConfigParser, ParsingError
 
@@ -315,6 +320,292 @@ def parse_celfile_v4(path, compressed = True, ignore_outliers = True, ignore_mas
 
     return np.float32(y)
 
+#cdef unsigned char read_UBYTE(char* buf, FILE* fp):
+#    fread(buf, 1, 1, fp)
+#    cdef unsigned char c = (<unsigned char*>buf)[0]
+#    return c
+
+#cdef int read_INT(char* buf, char* buf2, FILE* fp):
+#    fread(buf2, 4, 1, fp)
+#    reverse_copy(buf2, buf, 4)
+#    cdef int val = <int>decode_int32(buf)
+#    return val
+
+#cdef unsigned int read_UINT(char* buf, char* buf2, FILE* fp):
+#    fread(buf2, 4, 1, fp)
+#    reverse_copy(buf2, buf, 4)
+#    cdef unsigned int val = <int>decode_uint32(buf)
+#    return val
+
+cdef void reverse_copy(const char* src, char* dst, int num):
+    cdef int i
+    for i in range(num):
+        dst[num - i - 1] = src[i]
+
+cdef float read_FLOAT(char* buf, char* data):
+    reverse_copy(data, buf, 4)
+    cdef float val = (<float*>buf)[0]
+    return val
+
+cdef float[::1] read_cc_intensities(char* data, unsigned int num_values):
+    cdef float[::1] y = np.empty(num_values, dtype = np.float32)
+    cdef unsigned int i
+    cdef char* buf = <char*>malloc(10)
+    for i in range(num_values):
+        y[i] = read_FLOAT(buf, data)
+        data += 4
+    return y
+
+def parse_celfile_cc(path, compressed = True, ignore_outliers = True, ignore_masked = True):
+    """Parser for CEL file data in Command Console version 1 format.
+
+    See: http://media.affymetrix.com/support/developer/powertools/changelog/gcos-agcc/cel.html#calvin
+    Note: Data byte order is big endian!
+    """
+
+    read = [0]
+        
+    #decode_unicode = lambda s: codecs.decode(s, 'UTF-16-BE')
+    decode_unicode = lambda s: unicode(s, encoding = 'UTF-16-BE')
+    #decode_ascii = lambda s: codecs.decode(s, 'ascii')
+    decode_ascii = lambda s: unicode(s, encoding = 'ascii')
+    decode_float = lambda s: struct.unpack('>f', s)[0]
+    decode_int32 = lambda s: struct.unpack('>i', s)[0]
+    decode_uint32 = lambda s: struct.unpack('>I', s)[0]
+    decode_int8 = lambda s: struct.unpack('>b', s)[0]
+    decode_uint8 = lambda s: struct.unpack('>B', s)[0]
+    decode_int16 = lambda s: struct.unpack('>h', s)[0]
+    decode_uint16 = lambda s: struct.unpack('>H', s)[0]
+
+    def read_float(bytes):
+        read[0] += 4
+        return decode_float(fh.read(4))
+
+    def read_byte(fh):
+        read[0] += 1
+        return decode_int8(fh.read(1))
+
+    def read_ubyte(fh):
+        read[0] += 1
+        return decode_uint8(fh.read(1))
+
+    def read_short(fh):
+        read[0] += 2
+        return decode_int16(fh.read(2))
+
+    def read_ushort(fh):
+        read[0] += 2
+        return decode_uint16(fh.read(2))
+
+    def read_int(fh):
+        read[0] += 4
+        return decode_int32(fh.read(4))
+
+    def read_uint(fh):
+        read[0] +=4
+        return decode_uint32(fh.read(4))
+
+    def read_raw(fh):
+        # reads an int x and then x raw bytes
+        bytes = read_int(fh)
+        read[0] += bytes
+        return fh.read(bytes)
+
+    def read_string(fh):
+        strlen = read_int(fh)
+        read[0] += strlen
+        return fh.read(strlen)
+
+    def read_wstring(fh):
+        strlen = read_int(fh)
+        s = fh.read(2 * strlen)
+        read[0] += (2 * strlen)
+        return decode_unicode(s)
+
+    def read_guid(fh):
+        return read_string(fh)
+
+    def read_datetime(fh):
+        s = read_wstring(fh)
+        logger.debug('DateTime string: %s|||', s)
+        dt = None
+        if s:
+            dt = dateutil.parser.parse(s).replace(tzinfo = None)
+        #s = u'2015-02-20T13:52:11Z'
+        #print s
+        return dt
+
+    def read_locale(fh):
+        loc = read_wstring(fh)
+        return loc[:2], loc[3:]
+
+    def read_value(fh):
+        raw = read_raw(fh)
+        return raw
+
+    def read_type(fh):
+        return read_wstring(fh)
+
+    def read_file_header(fh):
+        magic_number = read_ubyte(fh)
+        logger.debug('Magic number: %d', magic_number)
+        # check magic number
+        assert isinstance(magic_number, int) and magic_number == 59
+        version_number = read_ubyte(fh)
+        # check version number
+        assert version_number == 1
+        num_data_groups = read_int(fh)
+        logger.debug('# data groups: %d', num_data_groups)
+        first_data_group_pos = read_uint(fh)
+        return num_data_groups, first_data_group_pos
+
+    def read_header_param(fh):
+        v1 = read_wstring(fh)
+        v2 = read_value(fh)
+        v3 = read_type(fh)
+
+        if v3 == 'text/plain':
+            v2 = decode_unicode(v2.rstrip('\x00'))
+        elif v3 == 'text/ascii':
+            v2 = decode_ascii(v2.rstrip('\x00'))
+        elif v3 == 'text/x-calvin-float':
+            v2 = decode_float(v2[:4])
+        elif v3 == 'text/x-calvin-integer-32':
+            v2 = decode_int32(v2[:4])
+        elif v3 == 'text/x-calvin-unsigned-integer-32':
+            v2 = decode_uint32(v2[:4])
+        elif v3 == 'text/x-calvin-unsigned-integer-8':
+            v2 = decode_uint8(v2[:1])
+        elif v3 == 'text/x-calvin-unsigned-integer-16':
+            v2 = decode_uint16(v2[:2])
+        elif v3 == 'text/x-calvin-integer-8':
+            v2 = decode_int8(v2[:1])
+        elif v3 == 'text/x-calvin-integer-16':
+            v2 = decode_int16(v2[:2])
+
+        return (v1, v2)
+
+    def read_data_header(fh):
+        data_type_id = read_guid(fh)
+        logger.debug('Data type identifier: %s', data_type_id)
+        file_id = read_guid(fh)
+        logger.debug('File identifier: %s', file_id)
+        creation_time = read_datetime(fh)
+        #print creation_time
+        iso639, iso3166 = read_locale(fh)
+        locale = '-'.join([iso639, iso3166])
+        n_params = read_int(fh)
+        logger.debug('Number of parameters (name/value/type triplets): %d', n_params)
+        params = OrderedDict()
+        for i in range(n_params):
+            params.update([read_header_param(fh)])
+
+        num_parents = read_int(fh)
+        logger.debug('Number of parent file headers: %d', num_parents)
+        
+        parent_headers = []
+        for i in range(num_parents):
+            logger.debug('')
+            logger.debug('-------------------------------------------')
+            parent_headers.append(read_data_header(fh))
+
+    def read_col(fh):
+        name = read_wstring(fh)
+        valtype = read_byte(fh)
+        size = read_int(fh)
+        return (name, valtype, size)
+
+    def read_dataset(fh):
+        logger.debug('New DataSet! Bytes read up until this point: %d', read[0])
+        data_pos = read_uint(fh)
+        next_pos = read_uint(fh)
+        data_size = next_pos - data_pos
+        name = read_wstring(fh)
+        num_params = read_int(fh)
+
+        # read parameters
+        params = OrderedDict()
+        for i in range(num_params):
+            params.update([read_header_param(fh)])
+
+        num_cols = read_uint(fh)
+        logger.debug('DataSet / # cols: %d', num_cols)
+        cols = []
+        for i in range(num_cols):
+            cols.append(read_col(fh))
+        col_names = [c[0] for c in cols]
+        logger.debug('DataSet / col names: %s', ', '.join(col_names))
+
+        num_rows = read_uint(fh)
+        logger.debug('DataSet / # rows: %d', num_rows)
+        logger.debug('DataSet / data position: %d', data_pos)
+        logger.debug('DataSet / next position: %d', next_pos)
+        logger.debug('DataSet / data size: %d', data_size)
+        logger.debug('DataSet / name: %s', name)
+        logger.debug('DataSet / # parameters: %d', num_params)
+        num_chars = next_pos - read[0]
+        data = fh.read(num_chars)
+        read[0] += num_chars
+        y = None
+        # this assumes that the column name etc. is 100% fixed
+        if name == 'Intensity':
+            assert len(cols) == 1
+            col_name = cols[0][0]
+            col_type = cols[0][1]
+            col_size = cols[0][2]
+            assert col_name == 'Intensity'
+            assert col_type == 6
+            assert col_size == 4
+            y = read_cc_intensities(data, num_rows)
+        return y
+
+    def read_data_group(fh):
+        logger.debug('New data group! Number of bytes read so far: %d', read[0])
+        next_pos = read_uint(fh)
+        dataset_pos = read_uint(fh)
+        num_datasets = read_int(fh)
+        name = read_wstring(fh)
+        logger.debug('Data group name: %s', name)
+        y = None
+        for i in range(num_datasets):
+            d = read_dataset(fh)
+            if d is not None:
+                y = d
+        return y
+
+    tmp_path = None
+    fh = None
+    y = None
+    if compressed:
+        # file is compressed (we assume gzip)
+        # create a named pipe
+        logger.debug('Parsing file: %s', path)
+        tmp_path = create_gzip_pipe(path)
+        path = tmp_path
+
+    try:
+        fh = io.open(path, mode = 'rb')
+        num_data_groups, data_pos = read_file_header(fh)
+        assert num_data_groups == 1 # for expression CEL file
+        logger.debug('# data groups: %d', num_data_groups)
+        logger.debug('pos. of first data group: %d', data_pos)
+        #header = read_data_header(fh)
+        read_data_header(fh)
+        assert data_pos == read[0] # position of the first data group
+        y = read_data_group(fh)
+        #data_groups = []
+        #for i in range(num_data_groups):
+        #    data_groups.append(read_data_group(fh))
+
+    finally:
+        if fh is not None:
+            fh.close()
+        if tmp_path is not None:
+            os.remove(tmp_path)
+
+    return np.float32(y)
+
+
 def try_open_gzip(path):
 
     fh = None
@@ -328,6 +619,7 @@ def try_open_gzip(path):
         fh = gzip.open(path)
 
     return fh
+
 
 def parse_cel(path):
     """Front-end for parsing a CEL file containing expression data.
@@ -382,7 +674,7 @@ def parse_cel(path):
     y = None
     if version == 59:
         # command console generic data file format (binary, big-endian)
-        raise NotImplemented('No parser for command console format!')
+        y = parse_celfile_cc(path, compressed = compressed)
     elif version == 64:
         # version 4 format (binary, little-endian)
         y = parse_celfile_v4(path, compressed = compressed)
