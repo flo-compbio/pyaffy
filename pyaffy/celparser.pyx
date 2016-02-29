@@ -114,11 +114,11 @@ cdef read_tag_val(void* buf, FILE* fp):
     try:
         C = ConfigParser(interpolation = None, delimiters = ('=',), empty_lines_in_values = False)
         C.optionxform = lambda x: x
-        C.read_string(u'[Section]\n' + unicode(s))
+        C.read_string(u'[Section]\n' + unicode(s, encoding = 'iso-8859-1'))
     except ParsingError:
         C = ConfigParser(interpolation = None, delimiters = (':',), empty_lines_in_values = False)
         C.optionxform = lambda x: x
-        C.read_string(u'[Section]\n' + unicode('\n'.join(s.split(';'))))
+        C.read_string(u'[Section]\n' + unicode('\n'.join(s.split(';')), encoding = 'iso-8859-1'))
         
     return C['Section']
 
