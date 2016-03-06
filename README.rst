@@ -42,8 +42,10 @@ Usage
 -----
 
 The `rma` function expects two parameters: A custom CDF file (from the
-`Brainarray web site`) and an ordered dictionary (`collections.OrderedDict`)
+`Brainarray web site`__) and an ordered dictionary (`collections.OrderedDict`)
 with sample names as keys and corresponding CEL files as values.
+
+__ brainarray_
 
 The `rma` function returns a list of genes, a list of samples, and an
 expression matrix (of type `numpy.ndarray`), in that order.
@@ -59,6 +61,7 @@ A small `example with real code`__ is available in the `pyaffy-demos` repository
 
 __ real_example_
 
+.. _brainarray: http://brainarray.mbni.med.umich.edu/Brainarray/Database/CustomCDF/genomic_curated_CDF.asp
 .. _real_example: https://github.com/flo-compbio/pyaffy-demos/tree/master/minimal
 
 Copyright and License
