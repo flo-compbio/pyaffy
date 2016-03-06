@@ -22,7 +22,8 @@ pyAffy
 
 pyAffy is a Python/Cython implementation of the RMA algorithm for
 processing raw data from Affymetrix expression microarrays. For a detailed
-discussion of this implementation, see the `pyAffy PeerJ preprint`__.
+discussion of this implementation, see the `pyAffy PeerJ preprint`__. For
+a list of changes, see the `changelog <changelog.rst>`_.
 
 __ peerj_preprint_
 
