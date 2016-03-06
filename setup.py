@@ -25,7 +25,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 
 name = 'pyaffy'
 root = 'pyaffy'
-version = '0.3rc1'
+version = '0.3.0'
 
 description = (
     'pyAffy: Processing raw data from Affymetrix expression microarrays in Python.'
