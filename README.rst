@@ -32,6 +32,17 @@ __ peerj_preprint_
 Installation
 ------------
 
+Option 1: Using `pip`
+~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+    $ pip install pyaffy
+
+
+Option 2: Cloning the GitHub repository
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 .. code-block:: bash
 
     $ git clone https://github.com/flo-compbio/pyaffy.git
