@@ -1,4 +1,5 @@
 # project-specific
+/.idea/
 
 # sphinx docs
 /docs/build/
