@@ -18,10 +18,10 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 ## from builtins import *
 # from builtins import open
-# from builtins import str as text
+from builtins import str as text
 
 #import str as text
-text = str
+#text = str
 
 # import os
 import shutil

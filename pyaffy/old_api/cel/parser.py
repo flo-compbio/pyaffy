@@ -17,6 +17,12 @@
 """Parser for Affymetrix CEL files.
 
 """
+
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+_oldstr = str
+from builtins import *
+
 import os
 import struct
 import dateutil.parser
@@ -35,7 +41,7 @@ logger = logging.getLogger(__name__)
 class CELParser(object):
 
     def __init__(self, path):
-        assert isinstance(path, (str, unicode))
+        assert isinstance(path, (str, _oldstr))
         self.path = path
 
     def _parse_cel_v4_intensities(self):
@@ -96,16 +102,16 @@ class CELParser(object):
 
         def read_tag_val(fh):
             """Returns an OrderedDict containing tag-value entries."""
-            raw = read_raw(fh)
+            raw = codecs.decode(read_raw(fh), encoding='iso-8859-1')
             logger.debug('Tag/Value string:\n%s', raw)
             try:
                 C = ConfigParser(interpolation = None, delimiters = ('=',), empty_lines_in_values = False)
                 C.optionxform = lambda x: x
-                C.read_string(u'[Section]\n' + unicode(raw))
+                C.read_string('[Section]\n' + raw)
             except ParsingError:
                 C = ConfigParser(interpolation = None, delimiters = (':',), empty_lines_in_values = False)
                 C.optionxform = lambda x: x
-                C.read_string(u'[Section]\n' + unicode('\n'.join(raw.split(';'))))
+                C.read_string('[Section]\n' + '\n'.join(raw.split(';')))
                 
             return C['Section']
 
@@ -151,11 +157,11 @@ class CELParser(object):
             logger.debug('Number of rows: %d', num_rows)
             logger.debug('Number of cols: %d', num_cols)
             header = read_tag_val(fh)
-            logger.debug('; '.join(['%s = %s' %(k,v) for k,v in header.iteritems()]))
+            logger.debug('; '.join(['%s = %s' %(k,v) for k,v in header.items()]))
             algo_name = read_raw(fh)
             logger.debug('Algorithm name: %s', algo_name)
             algo_params = read_tag_val(fh)
-            logger.debug('; '.join(['%s = %s' %(k,v) for k,v in algo_params.iteritems()]))
+            logger.debug('; '.join(['%s = %s' %(k,v) for k,v in algo_params.items()]))
             cell_margin = read_integer(fh)
             num_outlier_cells = read_DWORD(fh)
             num_masked_cells = read_DWORD(fh)

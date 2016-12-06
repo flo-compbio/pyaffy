@@ -1,6 +1,12 @@
 """Python API for data in Affymetrix CDF files for expression microarrays.
 
 """
+
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+_oldstr = str
+from builtins import *
+
 from collections import OrderedDict
 import logging
 import itertools as it
@@ -61,7 +67,7 @@ class ExpProbeSet(object):
             probe_pairs = []
 
         assert isinstance(id_, int)
-        assert isinstance(gene_id, (str, unicode))
+        assert isinstance(gene_id, (str, _oldstr))
         assert isinstance(probe_pairs, (list, tuple))
         
         for pp in probe_pairs:
@@ -85,7 +91,7 @@ class ExpCDF(object):
         assert isinstance(qc_probesets, (list, tuple))
         assert isinstance(exp_probesets, (list, tuple))
             
-        assert isinstance(name, (str, unicode))
+        assert isinstance(name, (str, _oldstr))
         assert isinstance(num_rows, int)
         assert isinstance(num_cols, int)
 
@@ -129,14 +135,14 @@ class ExpCDF(object):
         qc_probesets = []
         exp_probesets = []
         c = 0
-        for k, sec in C.iteritems():
+        for k, sec in C.items():
             if k.startswith('QC'):
                 # QC probe set
                 id_ = int(k[2:])
                 type_ = int(sec['Type'])
                 num_probes = int(sec['NumberCells'])
                 probes = []
-                for tag, valstr in sec.iteritems():
+                for tag, valstr in sec.items():
                     #print tag, valstr
                     if (not tag.startswith('Cell')) or tag == 'CellHeader':
                         continue
@@ -169,7 +175,7 @@ class ExpCDF(object):
                     gene_id = sec['Name']
                     num_probe_pairs = int(sec['NumAtoms'])
                     probe_pairs = []
-                    iterator = sec.iteritems()
+                    iterator = sec.items()
                     for tag, valstr in iterator:
                         if tag == 'CellHeader':
                             break

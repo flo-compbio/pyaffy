@@ -22,6 +22,12 @@ Cython parser for CEL files of Affymetrix GeneChip microarrays.
 See: http://media.affymetrix.com/support/developer/powertools/changelog/gcos-agcc/cel.html
 """
 
+from __future__ import (absolute_import, division,
+                        print_function)
+# _oldstr = str
+from builtins import str as text
+from builtins import open
+
 cimport cython
 
 from libc.stddef cimport size_t
@@ -29,7 +35,7 @@ from libc.stdlib cimport malloc, atol
 from libc.stdint cimport int16_t, int32_t, uint32_t
 from libc.stdio  cimport FILE, fopen, fread, fclose, fgets, sscanf
 from libc.string cimport strlen, strcmp
-from libc.math cimport NAN
+# from libc.math cimport NAN
 
 #from libc.string cimport memcpy
 #cdef extern from "stdio.h":
@@ -115,15 +121,17 @@ cdef char* read_string(void* buf, FILE* fp):
 
 cdef read_tag_val(void* buf, FILE* fp):
     """Returns an OrderedDict containing tag-value entries."""
-    s = str(read_string(buf, fp))
+
+    s = read_string(buf, fp).decode('iso-8859-1')
+    # s = codecs.decode(read_string(buf, fp), encoding='iso-8859-1')
     try:
         C = ConfigParser(interpolation = None, delimiters = ('=',), empty_lines_in_values = False)
         C.optionxform = lambda x: x
-        C.read_string(u'[Section]\n' + unicode(s, encoding = 'iso-8859-1'))
+        C.read_string(str('[Section]\n') + s)
     except ParsingError:
         C = ConfigParser(interpolation = None, delimiters = (':',), empty_lines_in_values = False)
         C.optionxform = lambda x: x
-        C.read_string(u'[Section]\n' + unicode('\n'.join(s.split(';')), encoding = 'iso-8859-1'))
+        C.read_string(str('[Section]\n') + '\n'.join(s.split(';')))
         
     return C['Section']
 
@@ -139,7 +147,8 @@ cdef void apply_mask(float[::1] y, int num_rows, int num_cols, short [:,::1] coo
     cdef int i, idx
     for i in range(num_coords):
         idx = num_rows * coords[i,1] + coords[i,0]
-        y[idx] = NAN
+        #y[idx] = NAN
+        y[idx] = float('nan')
 
 def create_gzip_pipe(path):
 
@@ -158,7 +167,7 @@ def parse_celfile_v3(path, compressed = True, newline_chars = 2):
 
     Currently, no support for parsing information on outliers and masked data.
     """
-    assert isinstance(path, (str, unicode))
+    assert isinstance(path, (text, str))
     assert isinstance(compressed, bool)
     assert isinstance(newline_chars, int)
 
@@ -171,15 +180,16 @@ def parse_celfile_v3(path, compressed = True, newline_chars = 2):
     cdef int i
     cdef float[::1] y
 
-    tmp_path = None
+    final_path = path
     if compressed:
         # file is compressed (we assume gzip)
         # create a named pipe
         logger.debug('Parsing file: %s', path)
-        tmp_path = create_gzip_pipe(path)
-        fp = fopen(tmp_path, 'r')
-    else:
-        fp = fopen(path, 'r')
+        final_path = create_gzip_pipe(path)
+
+    path_bytes = final_path.encode('UTF-8')
+    cdef char* c_path_bytes = path_bytes
+    fp = fopen(c_path_bytes, 'r')
 
     try:
         # parsing starts here
@@ -209,17 +219,22 @@ def parse_celfile_v3(path, compressed = True, newline_chars = 2):
 
     finally:
         fclose(fp)
-        if tmp_path is not None:
-            os.remove(tmp_path)
+        if compressed:
+            os.remove(final_path)
 
     return np.float32(y)
 
-def parse_celfile_v4(path, compressed = True, ignore_outliers = True, ignore_masked = True):
+
+def parse_celfile_v4(path, compressed=True, ignore_outliers=True, ignore_masked=True):
     """Parser for CEL file data in Version 4 format.
 
     See: http://media.affymetrix.com/support/developer/powertools/changelog/gcos-agcc/cel.html#V4
     Data encoding is little endian.
     """
+    assert isinstance(path, (text, str))
+    assert isinstance(compressed, bool)
+    assert isinstance(ignore_outliers, bool)
+    assert isinstance(ignore_masked, bool)
 
     cdef FILE* fp
     cdef void* buf = malloc(10)
@@ -246,20 +261,21 @@ def parse_celfile_v4(path, compressed = True, ignore_outliers = True, ignore_mas
 
     #cdef int i, j
     #cdef int x, y
-    tmp_path = None
 
+    final_path = path
     if compressed:
         # file is compressed (we assume gzip)
         # create a named pipe
         logger.debug('Parsing file: %s', path)
-        tmp_path = create_gzip_pipe(path)
-        fp = fopen(tmp_path, "rb")
-    else:
-        fp = fopen(path, "rb")
+        final_path = create_gzip_pipe(path)
 
-    y = None
+    path_bytes = final_path.encode('UTF-8')
+    cdef char* c_path_bytes = path_bytes
+    fp = fopen(c_path_bytes, 'r')
+
     try:
 
+        y = None
         magic_number = read_integer(buf, fp)
         assert isinstance(magic_number, int) and magic_number == 64
         version_number = read_integer(buf, fp)
@@ -275,13 +291,13 @@ def parse_celfile_v4(path, compressed = True, ignore_outliers = True, ignore_mas
         header = read_tag_val(buf, fp)
         logger.debug('Header information:')
         logger.debug('  ' + '; '.join(['%s = %s' %(k,v)
-                for k,v in header.iteritems()]))
+                for k,v in header.items()]))
         algo_name = str(read_string(buf, fp))
         logger.debug('Algorithm name: %s', algo_name)
         logger.debug('Algorithm parameters:')
         algo_params = read_tag_val(buf, fp)
         logger.debug('  ' + '; '.join(['%s = %s' %(k,v)
-                for k,v in algo_params.iteritems()]))
+                for k,v in algo_params.items()]))
 
         cell_margin = read_integer(buf, fp)
         logger.debug('Cell margin: %d', cell_margin)
@@ -315,10 +331,11 @@ def parse_celfile_v4(path, compressed = True, ignore_outliers = True, ignore_mas
         #    subgrids.append(read_subgrid(fh))
 
     finally:
-        if tmp_path is not None:
-            os.remove(tmp_path)
+        if compressed:
+            os.remove(final_path)
 
     return np.float32(y)
+
 
 #cdef unsigned char read_UBYTE(char* buf, FILE* fp):
 #    fread(buf, 1, 1, fp)
@@ -336,6 +353,7 @@ def parse_celfile_v4(path, compressed = True, ignore_outliers = True, ignore_mas
 #    reverse_copy(buf2, buf, 4)
 #    cdef unsigned int val = <int>decode_uint32(buf)
 #    return val
+
 
 cdef void reverse_copy(const char* src, char* dst, int num):
     cdef int i
@@ -356,19 +374,23 @@ cdef float[::1] read_cc_intensities(char* data, unsigned int num_values):
         data += 4
     return y
 
-def parse_celfile_cc(path, compressed = True, ignore_outliers = True, ignore_masked = True):
+def parse_celfile_cc(path, compressed=True, ignore_outliers=True, ignore_masked=True):
     """Parser for CEL file data in Command Console version 1 format.
 
     See: http://media.affymetrix.com/support/developer/powertools/changelog/gcos-agcc/cel.html#calvin
     Note: Data byte order is big endian!
     """
+    assert isinstance(path, (text, str))
+    assert isinstance(compressed, bool)
+    assert isinstance(ignore_outliers, bool)
+    assert isinstance(ignore_masked, bool)
 
     read = [0]
         
-    #decode_unicode = lambda s: codecs.decode(s, 'UTF-16-BE')
-    decode_unicode = lambda s: unicode(s, encoding = 'UTF-16-BE')
-    #decode_ascii = lambda s: codecs.decode(s, 'ascii')
-    decode_ascii = lambda s: unicode(s, encoding = 'ascii')
+    decode_unicode = lambda s: codecs.decode(s, 'UTF-16-BE')
+    #decode_unicode = lambda s: unicode(s, encoding = 'UTF-16-BE')
+    decode_ascii = lambda s: codecs.decode(s, 'ascii')
+    #decode_ascii = lambda s: unicode(s, encoding = 'ascii')
     decode_float = lambda s: struct.unpack('>f', s)[0]
     decode_int32 = lambda s: struct.unpack('>i', s)[0]
     decode_uint32 = lambda s: struct.unpack('>I', s)[0]
@@ -573,18 +595,17 @@ def parse_celfile_cc(path, compressed = True, ignore_outliers = True, ignore_mas
                 y = d
         return y
 
-    tmp_path = None
     fh = None
     y = None
+    final_path = path
     if compressed:
         # file is compressed (we assume gzip)
         # create a named pipe
         logger.debug('Parsing file: %s', path)
-        tmp_path = create_gzip_pipe(path)
-        path = tmp_path
+        final_path = create_gzip_pipe(path)
 
+    fh = open(final_path, mode='rb')
     try:
-        fh = io.open(path, mode = 'rb')
         num_data_groups, data_pos = read_file_header(fh)
         assert num_data_groups == 1 # for expression CEL file
         logger.debug('# data groups: %d', num_data_groups)
@@ -598,10 +619,9 @@ def parse_celfile_cc(path, compressed = True, ignore_outliers = True, ignore_mas
         #    data_groups.append(read_data_group(fh))
 
     finally:
-        if fh is not None:
-            fh.close()
-        if tmp_path is not None:
-            os.remove(tmp_path)
+        fh.close()
+        if compressed:
+            os.remove(final_path)
 
     return np.float32(y)
 
@@ -609,7 +629,6 @@ def parse_celfile_cc(path, compressed = True, ignore_outliers = True, ignore_mas
 def try_open_gzip(path):
 
     fh = None
-
     try:
         fh = gzip.open(path)
         fh.read(1)
@@ -639,7 +658,7 @@ def parse_cel(path):
 
     Parameters
     ----------
-    path: str or unicode
+    path: str
         The path of the CEL file.
 
     Returns
@@ -648,7 +667,7 @@ def parse_cel(path):
         The intensities from the array.
     """
 
-    assert isinstance(path, (str, unicode))
+    assert isinstance(path, (text, str))
 
     if not os.path.isfile(path):
         raise IOError('File "%s" not found.' %(path))
@@ -663,7 +682,7 @@ def parse_cel(path):
         if fh is not None:
             compressed = True
         else:
-            fh = io.open(path, 'rb')
+            fh = open(path, 'rb')
 
         version = ord(fh.read(1)) # read the first byte
 

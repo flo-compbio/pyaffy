@@ -25,7 +25,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 
 name = 'pyaffy'
 root = 'pyaffy'
-version = '0.3.1'
+version = '0.3.2'
 
 description = (
     'pyAffy: Processing raw data from Affymetrix expression microarrays in Python.'
@@ -134,11 +134,13 @@ setup(
 
     #install_requires = ['unicodecsv', 'xmltodict'],
     install_requires = [
+        'six>=1.10.0, <2',
+        'future>=0.16, <1',        
         'python-dateutil>=2.5.3, <3',
         'numpy>=1.10, <2',
         'scipy>=0.15.1, <1',
         'cython>=0.23.4, <1',
-        'genometools>=1.2.2, <2',
+        'genometools>=0.2, <0.3',
         'configparser>=3.5, <4',
         # 'future >= future-0.15.3.dev0, <1',
     ],

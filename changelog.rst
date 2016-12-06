@@ -28,3 +28,9 @@ Version 0.3.0 (2016-03-05)
 - Added a parser for the "Command Console" CEL file format.
 
 - CEL file parsers now use ISO-8859-1 encoding for text values.
+
+
+Version 0.3.2 (2016-12-06)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added Python 3 compatibility

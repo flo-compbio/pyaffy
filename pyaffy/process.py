@@ -14,6 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+_oldstr = str
+from builtins import *
+
 import os
 import time
 import logging
@@ -44,11 +49,11 @@ def rma(
 
     Parameters
     ----------
-    cdf_file: str or unicode
+    cdf_file: str
         The path of the Brainarray CDF file to use.
         Note: Brainarray CDF files can be downloaded from
             http://brainarray.mbni.med.umich.edu/Brainarray/Database/CustomCDF/genomic_curated_CDF.asp
-    sample_cel_files: collections.OrderedDict (str/unicode => str/unicode)
+    sample_cel_files: collections.OrderedDict (st => str)
         An ordered dictionary where each key/value-pair corresponds to a
         sample. The *key* is the sample name, and the *value* is the (absolute)
         path of the corresponding CEL file. The CEL files can be gzip'ed.
@@ -64,9 +69,9 @@ def rma(
 
     Returns
     -------
-    genes: tuple of (str or unicode)
+    genes: tuple of str
         The list of gene names.
-    samples: tuple of (str or unicode)
+    samples: tuple of str
         The list of sample names.
     X: np.ndarray (ndim = 2, dtype = np.float32)
         The expression matrix (genes-by-samples).
@@ -84,14 +89,14 @@ def rma(
     """
 
     ### checks
-    assert isinstance(cdf_file, (str, unicode))
+    assert isinstance(cdf_file, (str, _oldstr))
     assert os.path.isfile(cdf_file), \
             'CDF file "%s" does not exist!' %(cdf_file)
 
     assert isinstance(sample_cel_files, collections.OrderedDict)
-    for sample, cel_file in sample_cel_files.iteritems():
-        assert isinstance(sample, (str, unicode))
-        assert isinstance(cel_file, (str, unicode))
+    for sample, cel_file in sample_cel_files.items():
+        assert isinstance(sample, (str, _oldstr))
+        assert isinstance(cel_file, (str, _oldstr))
         assert os.path.isfile(cel_file), \
                 'CEL file "%s" does not exist!' %(cel_file)
 
@@ -110,10 +115,10 @@ def rma(
     if not pm_probes_only:
         probe_type = 'all'
     name, num_rows, num_cols, pm_probesets = \
-            parse_cdf(cdf_file,probe_type = probe_type)
+            parse_cdf(cdf_file, probe_type=probe_type)
 
     # concatenate indices of all PM probes into one long vector
-    pm_sel = np.concatenate(pm_probesets.values())
+    pm_sel = np.concatenate(list(pm_probesets.values()))
 
     t1 = time.time()
     logger.info('CDF file parsing time: %.2f s', t1 - t0)
@@ -126,11 +131,11 @@ def rma(
     p = pm_sel.size
     n = len(sample_cel_files)
     Y = np.empty((p, n), dtype = np.float32)
+
     samples = []
     sub_logger = logging.getLogger(celparser.__name__)
     sub_logger.setLevel(logging.WARNING)
-    for j, (sample, cel_file) in enumerate(sample_cel_files.iteritems()):
-
+    for j, (sample, cel_file) in enumerate(sample_cel_files.items()):
         logger.debug('Parsing CEL file for sample "%s": %s', sample, cel_file)
         samples.append(sample)
         y = parse_cel(cel_file)
@@ -149,18 +154,20 @@ def rma(
     else:
         logger.info('Skipping background correction.')
 
+    matrix = ExpMatrix(genes=pm_sel, samples=samples, X=Y)
+
     ### quantile normalization
     if quantile_normalize:
         logger.info('Performing quantile normalization...')
         t0 = time.time()
-        Y = qnorm(Y)
+        matrix = qnorm(matrix)
         t1 = time.time()
         logger.info('Quantile normalization time: %.1f s.', t1 - t0)
     else:
         logger.info('Skipping quantile normalization.')
 
     ### convert intensities to log2-scale
-    Y = np.log2(Y)
+    Y = np.log2(matrix.values)
 
     ### probeset summarization (with or without median polish)
     method = 'with'
@@ -175,7 +182,7 @@ def rma(
     cur = 0
     num_converged = 0
     genes = []
-    for i , (gene_id, probes) in enumerate(pm_probesets.iteritems()):
+    for i , (gene_id, probes) in enumerate(pm_probesets.items()):
         genes.append(gene_id)
 
         if medianpolish:

@@ -17,6 +17,10 @@
 """API for data in Affymetrix CEL files.
 
 """
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+_oldstr = str
+from builtins import *
 
 import os
 import sys
@@ -41,13 +45,13 @@ class CELHeader(object):
         if parent_headers is None:
             parent_headers = []
 
-        assert isinstance(data_type_id, (str, unicode))
-        assert isinstance(file_id, (str, unicode))
+        assert isinstance(data_type_id, (str, _oldstr))
+        assert isinstance(file_id, (str, _oldstr))
         
         if creation_time is not None:
             assert isinstance(creation_time, datetime.datetime)
 
-        assert isinstance(locale, (str, unicode))
+        assert isinstance(locale, (str, _oldstr))
         assert isinstance(params, OrderedDict)
         assert isinstance(parent_headers, (list, tuple))
         for h in parent_headers:
@@ -63,11 +67,11 @@ class CELHeader(object):
 class CELDataSet(object):
     def __init__(self, name, params, col_names, data):
         
-        assert isinstance(name, (str, unicode))
+        assert isinstance(name, (str, _oldstr))
         assert isinstance(params, OrderedDict)
         assert isinstance(col_names, list)
         for n in col_names:
-            assert isinstance(n, (str, unicode))
+            assert isinstance(n, (str, _oldstr))
         assert isinstance(data, (list, tuple))
         for d in data:
             assert isinstance(d, tuple)
@@ -101,7 +105,7 @@ class CELDataGroup(object):
         if datasets is None:
             datasets = []
     
-        assert isinstance(name, (str, unicode))
+        assert isinstance(name, (str, _oldstr))
         assert isinstance(datasets, (list, tuple))
         for ds in datasets:
             assert isinstance(ds, CELDataSet)

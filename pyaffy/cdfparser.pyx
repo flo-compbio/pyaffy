@@ -22,13 +22,21 @@ Cython parser for Brainarray CDF files for Affymetrix GeneChip microarrays.
 See: http://brainarray.mbni.med.umich.edu/Brainarray/Database/CustomCDF/genomic_curated_CDF.asp
 """
 
+#from __future__ import (absolute_import, division,
+#                        print_function, unicode_literals)
+from __future__ import (absolute_import, division,
+                        print_function)
+#_oldstr = str
+#from builtins import *
+from builtins import str as text
+
 cimport cython
 
 from libc.stddef cimport size_t
 from libc.stdlib cimport malloc
 from libc.stdio  cimport FILE, fopen, fread, fclose, fgets, sscanf
 from libc.string cimport strlen, strcmp
-#from libc.math cimport NAN
+# from libc.math cimport NAN
 
 import numpy as np
 cimport numpy as np
@@ -105,6 +113,7 @@ cdef np.uint32_t[::1] parse_probeset(char* buf, char* gene, int buf_size, size_t
 
     return ind
 
+
 def parse_cdf(path, probe_type = 'pm', newline_chars = 2):
     """Front-end for parsing a Brainarray CDF file.
 
@@ -114,9 +123,9 @@ def parse_cdf(path, probe_type = 'pm', newline_chars = 2):
 
     Parameters
     ----------
-    path: str or unicode
+    path: str
         The path of the CDF file
-    probe_type: str or unicode
+    probe_type: str
         The type of probes to read. Either "pm" (perfect match probes)
 
     Returns
@@ -135,8 +144,8 @@ def parse_cdf(path, probe_type = 'pm', newline_chars = 2):
         contains the probe indices for the order in which probe intensities are
         stored in CEL files (column-first order).
     """
-    assert isinstance(path, (str, unicode))
-    assert isinstance(probe_type, (str, unicode))
+    assert isinstance(path, (text, str))
+    assert isinstance(probe_type, (text, str))
     assert isinstance(newline_chars, int)
 
     cdef int buf_size = 1000
@@ -167,7 +176,11 @@ def parse_cdf(path, probe_type = 'pm', newline_chars = 2):
         probes = PROBES_PM
 
     probesets = OrderedDict()
-    fp = fopen(path, 'r')
+
+    path_bytes = path.encode('UTF-8')
+    cdef char* c_path_bytes = path_bytes
+
+    fp = fopen(c_path_bytes, 'r')
 
     try:
         # parsing starts here
@@ -215,4 +228,4 @@ def parse_cdf(path, probe_type = 'pm', newline_chars = 2):
     #print "cols = %d" %(int(num_cols))
     #print "number of probesets = %d" %(int(num_probesets))
 
-    return str(name), int(num_rows), int(num_cols), probesets
+    return text(name), int(num_rows), int(num_cols), probesets
